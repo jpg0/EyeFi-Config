@@ -487,6 +487,21 @@ char *convert_ascii_to_hex(char *ascii)
 	return hex;
 }
 
+int hex_only(char *str)
+{
+	int i;
+
+	for (i = 0; i < strlen(str); i++) {
+		if (((str[i] >= 'a') && str[i] <= 'f') ||
+		    ((str[i] >= 'A') && str[i] <= 'F') ||
+		    ((str[i] >= '0') && str[i] <= '9')) {
+			continue;
+		}
+		return 0;
+	}
+	return 1;
+}
+
 int make_network_key(struct network_key *key, char *essid, char *pass)
 {
 	char *hex_pass;
@@ -496,24 +511,28 @@ int make_network_key(struct network_key *key, char *essid, char *pass)
 	eyefi_printf(" interpreting passphrase as ");
 	switch (pass_len) {
 		case WPA_KEY_BYTES*2:
-			eyefi_printf("hex WPA");
-			hex_pass = convert_ascii_to_hex(pass);
-			if (!hex_pass)
-				return -EINVAL;
-			key->len = pass_len/2;
+			if (hex_only(pass)) {
+				eyefi_printf("hex WPA");
+				hex_pass = convert_ascii_to_hex(pass);
+				if (!hex_pass)
+					return -EINVAL;
+				key->len = pass_len/2;
 			memcpy(&key->wpa.key[0], hex_pass, key->len);
-			free(hex_pass);
-			break;
+				free(hex_pass);
+				break;
+			}
 		case WEP_KEY_BYTES*2:
 		case WEP_40_KEY_BYTES*2:
-			eyefi_printf("hex WEP");
-			hex_pass = convert_ascii_to_hex(pass);
-			if (!hex_pass)
-				return -EINVAL;
-			key->len = pass_len/2;
-			memcpy(&key->wep.key[0], hex_pass, key->len);
-			free(hex_pass);
-			break;
+			if (hex_only(pass)) {
+				eyefi_printf("hex WEP");
+				hex_pass = convert_ascii_to_hex(pass);
+				if (!hex_pass)
+					return -EINVAL;
+				key->len = pass_len/2;
+				memcpy(&key->wep.key[0], hex_pass, key->len);
+				free(hex_pass);
+				break;
+			}
 		default:
 			eyefi_printf("ASCII WPA");
 		        pbkdf2_sha1(pass, essid, strlen(essid), 4096,
@@ -560,7 +579,9 @@ int var_byte_len(struct var_byte_response *vb)
 }
 
 
+#ifndef offsetof
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#endif
 int card_config_set(enum card_info_subcommand cmd, struct var_byte_response *args)
 {
 	int len;
